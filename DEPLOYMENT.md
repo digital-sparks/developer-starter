@@ -266,10 +266,56 @@ Then add the variables above within each environment for environment-specific va
 
 1. Push code to `master`/`main` (production) or `staging` branch
 2. GitHub Actions deploys your pre-built `dist/` folder to S3
-3. Invalidates CloudFront cache
-4. Your files are live on CloudFront!
+3. If an `assets/` folder exists, it uploads it to S3 as well
+4. Invalidates CloudFront cache
+5. Your files are live on CloudFront!
 
 **Note:** The workflow deploys the `dist/` folder that's already committed to your repository. Make sure to run `pnpm build` locally and commit the built files before pushing.
+
+### Using the Assets Folder
+
+You can store static files (videos, images, documents, etc.) in an `assets/` folder in your project root. These will be automatically uploaded to S3 during deployment.
+
+**Setup:**
+
+1. Create an `assets` folder in your project root:
+   ```bash
+   mkdir assets
+   ```
+
+2. Add your files (videos, images, PDFs, etc.):
+   ```
+   assets/
+   ├── videos/
+   │   ├── intro.mp4
+   │   └── demo.webm
+   ├── images/
+   │   └── hero.jpg
+   └── documents/
+       └── guide.pdf
+   ```
+
+3. Commit and push the assets folder:
+   ```bash
+   git add assets/
+   git commit -m "Add video and image assets"
+   git push
+   ```
+
+**Accessing assets:**
+
+Your assets will be available at:
+```
+https://YOUR_CLOUDFRONT_DOMAIN/assets/videos/intro.mp4
+https://YOUR_CLOUDFRONT_DOMAIN/assets/images/hero.jpg
+https://YOUR_CLOUDFRONT_DOMAIN/assets/documents/guide.pdf
+```
+
+**Important notes:**
+- Assets are cached with `max-age=31536000` (1 year) for optimal performance
+- The assets folder uses `--delete`, so removing files from your repo will also delete them from S3
+- Keep asset files reasonably sized for faster uploads and better user experience
+- Consider using video formats like WebM or MP4 with H.264 encoding for best browser compatibility
 
 ### Access Your Files
 

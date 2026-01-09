@@ -62,6 +62,22 @@ jobs:
             --metadata-directive REPLACE \
             --cache-control "$CACHE_CONTROL_DEFAULT"
 
+      - name: Sync assets/ → S3
+        if: hashFiles('assets/**') != ''
+        run: |
+          set -euo pipefail
+          if [ -d "assets" ]; then
+            echo "Uploading assets folder..."
+            aws s3 sync ./assets "s3://$S3_BUCKET/assets" \
+              --delete \
+              --only-show-errors \
+              --metadata-directive REPLACE \
+              --cache-control "public, max-age=31536000, immutable"
+            echo "✅ Assets uploaded successfully"
+          else
+            echo "No assets folder found, skipping..."
+          fi
+
       - name: Invalidate CloudFront
         run: |
           set -euo pipefail
