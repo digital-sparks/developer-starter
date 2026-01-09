@@ -26,6 +26,3 @@ typings/
 
 # Claude
 .claude
-
-# Production files
-dist

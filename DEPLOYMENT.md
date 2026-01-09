@@ -1,128 +1,160 @@
 # Deployment Configuration Guide
 
-This project supports two deployment targets:
+This project supports three deployment options. Choose based on your use case:
 
-1. **npm** - Publish as an npm package
-2. **S3 + CloudFront** - Deploy static files to AWS (e.g., for CDN hosting like jsDelivr alternative)
+1. **jsDelivr CDN** - Free CDN for public GitHub repositories (easiest!)
+2. **S3 + CloudFront** - Private AWS CDN for any repository
+3. **npm Publishing** - Publish as an npm package (optional)
 
-You can enable one, both, or neither deployment target using GitHub repository variables.
-
-**Note:** This simplified setup deploys only to production (master/main branch). If you need staging environments, see the [Staging Setup](#optional-staging-environment-setup) section below.
-
----
-
-## 🎛️ Quick Configuration
-
-### Enable/Disable Deployments
-
-Go to your GitHub repository: **Settings → Secrets and variables → Actions → Variables tab**
-
-Add these variables:
-
-| Variable             | Value             | Description                          |
-| -------------------- | ----------------- | ------------------------------------ |
-| `ENABLE_NPM_PUBLISH` | `true` or `false` | Enable npm publishing via Changesets |
-| `ENABLE_S3_DEPLOY`   | `true` or `false` | Enable S3/CloudFront deployment      |
-
-### Configuration Examples
-
-**Option 1: npm only (default)**
-
-```
-ENABLE_NPM_PUBLISH = true
-ENABLE_S3_DEPLOY = false (or omit)
-```
-
-**Option 2: S3/CloudFront only**
-
-```
-ENABLE_NPM_PUBLISH = false (or omit)
-ENABLE_S3_DEPLOY = true
-```
-
-**Option 3: Both npm and S3/CloudFront**
-
-```
-ENABLE_NPM_PUBLISH = true
-ENABLE_S3_DEPLOY = true
-```
-
-**Option 4: Neither (manual deployment only)**
-
-```
-ENABLE_NPM_PUBLISH = false (or omit)
-ENABLE_S3_DEPLOY = false (or omit)
-```
+You can use one, multiple, or none of these options.
 
 ---
 
-## 📦 Option 1: npm Publishing
+## 📦 Option 1: jsDelivr CDN (Public Repos Only)
 
-### Prerequisites
+**Best for:** Public repositories that want free, automatic CDN hosting.
 
-1. **Configure npm as a Trusted Publisher** (no tokens needed!)
+### Requirements
 
-   - Go to [npm Trusted Publishers](https://docs.npmjs.com/trusted-publishers)
-   - Add your GitHub repository as a trusted publisher
-
-2. **Enable GitHub Actions permissions**
-   - Repository Settings → Actions → General → Workflow Permissions
-   - ✅ Read and write permissions
-   - ✅ Allow GitHub Actions to create and approve pull requests
-
-### Configuration
-
-Set this variable in GitHub:
-
-```
-ENABLE_NPM_PUBLISH = true
-```
+- Repository must be **public** on GitHub
+- Files must be committed to the repository (in `dist/` folder)
 
 ### How It Works
 
-1. Merge code to `master` branch
-2. Changesets bot creates "Version Packages" PR
-3. Merge the "Version Packages" PR
-4. Package is automatically published to npm via OIDC
+jsDelivr automatically serves files from your GitHub repository's releases and commits. No setup required!
 
-### Files Deployed
+### Usage
 
-The `dist/` folder contents are published to npm as defined in `package.json`:
+**Load from latest commit:**
 
-```json
-{
-  "files": ["dist"]
-}
+```html
+<script src="https://cdn.jsdelivr.net/gh/YOUR_USERNAME/YOUR_REPO@master/dist/index.js"></script>
 ```
+
+**Load from specific version/tag:**
+
+```html
+<script src="https://cdn.jsdelivr.net/gh/YOUR_USERNAME/YOUR_REPO@1.2.3/dist/index.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/YOUR_USERNAME/YOUR_REPO@v1.2.3/dist/index.js"></script>
+```
+
+**Load from specific commit:**
+
+```html
+<script src="https://cdn.jsdelivr.net/gh/YOUR_USERNAME/YOUR_REPO@abc1234/dist/index.js"></script>
+```
+
+### Examples
+
+For repository `digital-sparks/my-project`:
+
+```html
+<!-- Latest version from master -->
+<script src="https://cdn.jsdelivr.net/gh/digital-sparks/my-project@master/dist/index.js"></script>
+
+<!-- Specific release version -->
+<script src="https://cdn.jsdelivr.net/gh/digital-sparks/my-project@1.0.0/dist/index.js"></script>
+
+<!-- Load CSS file -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/digital-sparks/my-project@master/dist/styles.css">
+```
+
+### Cache Busting
+
+jsDelivr caches files for 7 days. To force cache refresh:
+
+```html
+<!-- Add ?v=timestamp parameter -->
+<script src="https://cdn.jsdelivr.net/gh/digital-sparks/my-project@master/dist/index.js?v=20250109"></script>
+```
+
+Or use specific version tags:
+
+```bash
+# Create and push a new tag
+git tag v1.0.1
+git push origin v1.0.1
+```
+
+Then reference it:
+
+```html
+<script src="https://cdn.jsdelivr.net/gh/digital-sparks/my-project@v1.0.1/dist/index.js"></script>
+```
+
+### Pros & Cons
+
+✅ **Pros:**
+- Free and unlimited
+- No configuration needed
+- Automatic CDN distribution worldwide
+- Works with any public GitHub repo
+- Can load from commits, branches, or tags
+
+❌ **Cons:**
+- Only works for public repositories
+- Files must be committed to the repo
+- Limited control over caching
+- Not suitable for private/client projects
 
 ---
 
 ## ☁️ Option 2: S3 + CloudFront Deployment
 
-Deploy your built files to AWS S3 and serve them via CloudFront CDN (like a private jsDelivr).
+**Best for:** Private repositories or projects requiring full control over CDN hosting.
 
 ### Prerequisites
 
-#### 1. AWS Resources Setup
-
-Create these AWS resources:
-
-**S3 Bucket:**
+**You'll need your AWS Account ID** for several steps. Get it by running:
 
 ```bash
-aws s3 mb s3://your-cdn-bucket-name
+aws sts get-caller-identity --query Account --output text
 ```
 
-**CloudFront Distribution:**
+### Step 1: Create S3 Bucket
 
-- Origin: Your S3 bucket
-- Origin Access: OAC (Origin Access Control)
-- Cache behavior: Optimize for static content
+```bash
+aws s3 mb s3://your-cdn-bucket-name --region us-east-1
+```
 
-**IAM OIDC Role:**
-Create an IAM role with this trust policy:
+Replace `us-east-1` with your preferred region.
 
-```json
+### Step 2: Create CloudFront Distribution
+
+**Via AWS Console:**
+
+1. Go to **CloudFront** → **Create distribution**
+2. **Origin domain**: Select your S3 bucket
+3. **Origin access**: Select "Origin access control settings (recommended)"
+4. Click **Create new OAC** → Create
+5. **Viewer protocol policy**: Redirect HTTP to HTTPS
+6. **Default root object**: `index.html` (optional)
+7. Click **Create distribution**
+8. **Important**: After creation, click "Copy policy" and add it to your S3 bucket permissions
+
+**Get your Distribution ID:**
+
+```bash
+aws cloudfront list-distributions --query "DistributionList.Items[*].{Id:Id,Domain:DomainName,Origin:Origins.Items[0].DomainName}" --output table
+```
+
+### Step 3: Create GitHub OIDC Identity Provider
+
+This is a **one-time setup per AWS account**:
+
+```bash
+aws iam create-open-id-connect-provider \
+    --url https://token.actions.githubusercontent.com \
+    --client-id-list sts.amazonaws.com \
+    --thumbprint-list 6938fd4d98bab03faadb97b34396831e3780aea1
+```
+
+### Step 4: Create IAM Role with Trust Policy
+
+Create the trust policy file (replace `YOUR_ACCOUNT_ID`, `YOUR_GITHUB_ORG`, and `YOUR_REPO`):
+
+```bash
+cat > trust-policy.json << 'EOF'
 {
   "Version": "2012-10-17",
   "Statement": [
@@ -143,29 +175,68 @@ Create an IAM role with this trust policy:
     }
   ]
 }
+EOF
 ```
 
-Attach this policy to the role:
+Create the role:
 
-```json
+```bash
+aws iam create-role \
+    --role-name GitHubActionsCDNDeploy \
+    --assume-role-policy-document file://trust-policy.json
+```
+
+### Step 5: Attach Permissions Policy
+
+Create the permissions policy file (replace `your-cdn-bucket-name`, `YOUR_ACCOUNT_ID`, and `YOUR_DIST_ID`):
+
+```bash
+cat > cdn-deploy-policy.json << 'EOF'
 {
   "Version": "2012-10-17",
   "Statement": [
     {
       "Effect": "Allow",
-      "Action": ["s3:PutObject", "s3:GetObject", "s3:ListBucket", "s3:DeleteObject"],
-      "Resource": ["arn:aws:s3:::your-cdn-bucket-name", "arn:aws:s3:::your-cdn-bucket-name/*"]
+      "Action": [
+        "s3:PutObject",
+        "s3:GetObject",
+        "s3:ListBucket",
+        "s3:DeleteObject"
+      ],
+      "Resource": [
+        "arn:aws:s3:::your-cdn-bucket-name",
+        "arn:aws:s3:::your-cdn-bucket-name/*"
+      ]
     },
     {
       "Effect": "Allow",
-      "Action": ["cloudfront:CreateInvalidation"],
+      "Action": "cloudfront:CreateInvalidation",
       "Resource": "arn:aws:cloudfront::YOUR_ACCOUNT_ID:distribution/YOUR_DIST_ID"
     }
   ]
 }
+EOF
 ```
 
-#### 2. GitHub Configuration
+Attach the policy to the role:
+
+```bash
+aws iam put-role-policy \
+    --role-name GitHubActionsCDNDeploy \
+    --policy-name CDNDeployPolicy \
+    --policy-document file://cdn-deploy-policy.json
+```
+
+#### Quick Reference: Values to Replace
+
+| Placeholder                  | How to Get It                                                                          |
+| ---------------------------- | -------------------------------------------------------------------------------------- |
+| `YOUR_ACCOUNT_ID`            | `aws sts get-caller-identity --query Account --output text`                           |
+| `your-cdn-bucket-name`       | Your S3 bucket name (from Step 1)                                                      |
+| `YOUR_DIST_ID`               | `aws cloudfront list-distributions --query "DistributionList.Items[*].Id" --output text` |
+| `YOUR_GITHUB_ORG/YOUR_REPO`  | Your GitHub repository path (e.g., `digital-sparks/my-project`)                       |
+
+### Step 6: GitHub Configuration
 
 Go to: **Settings → Secrets and variables → Actions → Variables tab**
 
@@ -174,12 +245,13 @@ Add these variables:
 | Variable                     | Example Value                                      | Description                |
 | ---------------------------- | -------------------------------------------------- | -------------------------- |
 | `ENABLE_S3_DEPLOY`           | `true`                                             | Enable S3 deployment       |
-| `AWS_OIDC_ROLE_ARN`          | `arn:aws:iam::123456789012:role/GitHubActionsRole` | IAM role ARN               |
+| `AWS_REGION`                 | `us-east-1`                                        | AWS region for S3/CloudFront |
+| `AWS_OIDC_ROLE_ARN`          | `arn:aws:iam::123456789012:role/GitHubActionsCDNDeploy` | IAM role ARN         |
 | `S3_BUCKET`                  | `your-cdn-bucket-name`                             | S3 bucket name             |
 | `CLOUDFRONT_DISTRIBUTION_ID` | `E1234567890ABC`                                   | CloudFront distribution ID |
 | `CACHE_CONTROL_DEFAULT`      | `public, max-age=31536000, immutable`              | (Optional) Cache headers   |
 
-#### 3. Environment Setup (Optional)
+### Step 7: Environment Setup (Optional)
 
 For production/staging separation:
 
@@ -188,17 +260,24 @@ For production/staging separation:
 - Environment name: `production`
 - Environment name: `staging`
 
-Then update variables with environment-specific values.
+Then add the variables above within each environment for environment-specific values.
 
 ### How It Works
 
 1. Push code to `master`/`main` (production) or `staging` branch
-2. GitHub Actions builds your project (`pnpm build`)
-3. Syncs `dist/` folder to S3 bucket
-4. Invalidates CloudFront cache
-5. Your files are live on CloudFront!
+2. GitHub Actions deploys your pre-built `dist/` folder to S3
+3. Invalidates CloudFront cache
+4. Your files are live on CloudFront!
+
+**Note:** The workflow deploys the `dist/` folder that's already committed to your repository. Make sure to run `pnpm build` locally and commit the built files before pushing.
 
 ### Access Your Files
+
+Get your CloudFront domain:
+
+```bash
+aws cloudfront list-distributions --query "DistributionList.Items[*].DomainName" --output text
+```
 
 Your files will be available at:
 
@@ -206,180 +285,163 @@ Your files will be available at:
 https://YOUR_CLOUDFRONT_DOMAIN/index.js
 ```
 
-Example:
+Example usage:
 
 ```html
 <script src="https://d123abc456def.cloudfront.net/index.js"></script>
 ```
 
----
+### Troubleshooting
 
-## 🔄 Workflow Triggers
-
-### npm Publishing (`release.yml`)
-
-- **Trigger:** Push to `master` or `main` branch
-- **Condition:** `ENABLE_NPM_PUBLISH = true`
-- **Action:** Creates version PR → Publishes to npm when merged
-
-### S3 Deployment (`deploy-s3.yml`)
-
-- **Trigger:** Push to `master`, `main`, or `staging` branch
-- **Condition:** `ENABLE_S3_DEPLOY = true`
-- **Action:** Builds and syncs `dist/` to S3, invalidates CloudFront
+| Error                           | Solution                                                                                 |
+| ------------------------------- | ---------------------------------------------------------------------------------------- |
+| No OpenIDConnect provider found | Run Step 3 to create the OIDC provider                                                   |
+| AccessDenied on s3:ListBucket   | Ensure your policy has both `arn:aws:s3:::bucket` and `arn:aws:s3:::bucket/*` in Resource |
+| dist/ directory not found       | Make sure `dist/` is NOT in `.gitignore` and you've committed the built files            |
+| Variables not working           | Ensure `ENABLE_S3_DEPLOY` is set to `true` and all required variables are configured     |
 
 ---
 
-## 🎯 Common Scenarios
+## 📦 Option 3: npm Publishing (Optional)
 
-### Scenario 1: Library for npm
+**Best for:** Publishing reusable JavaScript libraries that other developers will install via npm.
 
-You're building a JavaScript library for other developers.
+**Note:** This is completely optional. Most Webflow/client projects don't need npm publishing.
 
-**Configuration:**
+### Prerequisites
+
+1. **Create npm account** at [npmjs.com](https://www.npmjs.com/)
+2. **Configure npm as a Trusted Publisher** (no tokens needed!)
+   - Go to [npm Trusted Publishers](https://docs.npmjs.com/trusted-publishers)
+   - Add your GitHub repository as a trusted publisher
+3. **Enable GitHub Actions permissions**
+   - Repository Settings → Actions → General → Workflow Permissions
+   - ✅ Read and write permissions
+   - ✅ Allow GitHub Actions to create and approve pull requests
+
+### Configuration
+
+Set this variable in GitHub: **Settings → Secrets and variables → Actions → Variables**
 
 ```
 ENABLE_NPM_PUBLISH = true
-ENABLE_S3_DEPLOY = false
 ```
 
-**Usage:**
+### How It Works
+
+1. Merge code to `master` branch
+2. Run `pnpm changeset` to document your changes
+3. Commit and push the changeset
+4. Merge to master
+5. Changesets bot creates "Version Packages" PR automatically
+6. Merge the "Version Packages" PR
+7. Package is automatically published to npm via OIDC
+
+### Files Deployed
+
+The `dist/` folder contents are published to npm as defined in `package.json`:
+
+```json
+{
+  "files": ["dist"]
+}
+```
+
+### Usage After Publishing
 
 ```bash
 npm install your-package-name
 ```
 
-### Scenario 2: Webflow/Client Project
+```javascript
+import { yourFunction } from 'your-package-name';
+```
 
-You're building custom JavaScript for a Webflow site or client project.
+---
 
-**Configuration:**
+## 🎯 Which Option Should I Use?
+
+### For Webflow/Client Projects
+
+**Use jsDelivr** if:
+- ✅ Repository is public
+- ✅ You're okay with files being publicly visible
+- ✅ You want zero setup
+
+**Use S3/CloudFront** if:
+- ✅ Repository is private
+- ✅ You need full control over CDN
+- ✅ Client requires private hosting
+
+### For npm Libraries
+
+**Use npm Publishing** if:
+- ✅ Building a reusable JavaScript library
+- ✅ Other developers will install it via npm
+- ✅ You want version management via npm
+
+### Combined Approach
+
+You can use multiple options together:
 
 ```
-ENABLE_NPM_PUBLISH = false
+ENABLE_NPM_PUBLISH = true   # For npm developers
+ENABLE_S3_DEPLOY = true     # For CDN/browser usage
+```
+
+Plus jsDelivr works automatically for public repos!
+
+---
+
+## 🎛️ Quick Configuration Summary
+
+### Enable/Disable Deployments
+
+Go to: **Settings → Secrets and variables → Actions → Variables tab**
+
+| Variable             | Value             | Description                          |
+| -------------------- | ----------------- | ------------------------------------ |
+| `ENABLE_NPM_PUBLISH` | `true` or `false` | Enable npm publishing via Changesets |
+| `ENABLE_S3_DEPLOY`   | `true` or `false` | Enable S3/CloudFront deployment      |
+
+### Configuration Examples
+
+**jsDelivr only (public repo):**
+```
+# No configuration needed - works automatically!
+```
+
+**S3/CloudFront only:**
+```
 ENABLE_S3_DEPLOY = true
+ENABLE_NPM_PUBLISH = false (or omit)
 ```
 
-**Usage:**
-
-```html
-<script src="https://your-cdn.cloudfront.net/index.js"></script>
+**npm only:**
+```
+ENABLE_NPM_PUBLISH = true
+ENABLE_S3_DEPLOY = false (or omit)
 ```
 
-### Scenario 3: Both
-
-You want to publish to npm AND host on CDN.
-
-**Configuration:**
-
+**All options (public repo):**
 ```
 ENABLE_NPM_PUBLISH = true
 ENABLE_S3_DEPLOY = true
+# jsDelivr works automatically
 ```
-
-**Usage:**
-
-```bash
-# For developers
-npm install your-package-name
-
-# For browser/CDN
-<script src="https://your-cdn.cloudfront.net/index.js"></script>
-```
-
----
-
-## 🔧 Troubleshooting
-
-### npm Publishing Issues
-
-**Problem:** "Version Packages" PR not created
-
-- **Check:** Is `ENABLE_NPM_PUBLISH = true`?
-- **Check:** Did you create a changeset with `pnpm changeset`?
-- **Check:** Are GitHub Actions permissions enabled?
-
-**Problem:** npm publish fails with authentication error
-
-- **Check:** Is your repository configured as a [Trusted Publisher on npm](https://docs.npmjs.com/trusted-publishers)?
-
-### S3 Deployment Issues
-
-**Problem:** Deployment workflow doesn't run
-
-- **Check:** Is `ENABLE_S3_DEPLOY = true`?
-- **Check:** Did you push to `master`, `main`, or `staging` branch?
-
-**Problem:** AWS authentication fails
-
-- **Check:** Is `AWS_OIDC_ROLE_ARN` correct?
-- **Check:** Does the IAM role trust policy match your repository?
-- **Check:** Does the IAM role have S3 and CloudFront permissions?
-
-**Problem:** S3 sync fails
-
-- **Check:** Does the S3 bucket exist?
-- **Check:** Is `S3_BUCKET` variable set correctly?
-- **Check:** Does the IAM role have `s3:PutObject` permission?
-
-**Problem:** CloudFront invalidation fails
-
-- **Check:** Is `CLOUDFRONT_DISTRIBUTION_ID` correct?
-- **Check:** Does the IAM role have `cloudfront:CreateInvalidation` permission?
-
----
-
-## 📝 Testing Deployments
-
-### Test npm Publishing (Local)
-
-```bash
-# Build and check what would be published
-pnpm build
-npm pack --dry-run
-```
-
-### Test S3 Deployment (Local)
-
-```bash
-# Install AWS CLI
-brew install awscli  # macOS
-# or: pip install awscli
-
-# Configure credentials
-aws configure
-
-# Test sync
-pnpm build
-aws s3 sync ./dist s3://your-bucket-name --dry-run
-```
-
----
-
-## 🚀 Quick Start Checklist
-
-### For npm Publishing:
-
-- [ ] Create npm account
-- [ ] Configure [Trusted Publisher](https://docs.npmjs.com/trusted-publishers)
-- [ ] Set `ENABLE_NPM_PUBLISH = true` in GitHub
-- [ ] Enable GitHub Actions permissions
-- [ ] Test with `pnpm changeset` → merge PR
-
-### For S3/CloudFront Deployment:
-
-- [ ] Create S3 bucket
-- [ ] Create CloudFront distribution
-- [ ] Create IAM OIDC role with policies
-- [ ] Set all AWS variables in GitHub
-- [ ] Set `ENABLE_S3_DEPLOY = true`
-- [ ] Test by pushing to master/staging
 
 ---
 
 ## 📚 Additional Resources
 
+- [jsDelivr Documentation](https://www.jsdelivr.com/documentation)
 - [GitHub OIDC with AWS](https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/configuring-openid-connect-in-amazon-web-services)
 - [npm Trusted Publishers](https://docs.npmjs.com/trusted-publishers)
 - [Changesets Documentation](https://github.com/changesets/changesets)
 - [CloudFront Cache Invalidation](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/Invalidation.html)
+
+---
+
+## Attribution
+
+This deployment guide is part of the Digital Sparks Developer Starter, based on the [Finsweet Developer Starter](https://github.com/finsweet/developer-starter) template. We thank Finsweet for their excellent work.
