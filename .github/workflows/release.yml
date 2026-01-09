@@ -9,6 +9,8 @@ on:
 jobs:
   Release:
     name: Release
+    # Only run if npm publishing is enabled
+    if: vars.ENABLE_NPM_PUBLISH == 'true'
     runs-on: ubuntu-latest
     permissions:
       id-token: write

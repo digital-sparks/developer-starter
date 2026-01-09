@@ -1,5 +1,6 @@
 import * as esbuild from 'esbuild';
 import { readdirSync } from 'fs';
+import { createServer, request } from 'http';
 import { join, sep } from 'path';
 
 // Config output
@@ -7,7 +8,8 @@ const BUILD_DIRECTORY = 'dist';
 const PRODUCTION = process.env.NODE_ENV === 'production';
 
 // Config entrypoint files
-const ENTRY_POINTS = ['src/index.ts'];
+// You can use both .js and .ts files as entry points
+const ENTRY_POINTS = ['src/index.js'];
 
 // Config dev serving
 const LIVE_RELOAD = !PRODUCTION;
@@ -37,12 +39,58 @@ if (PRODUCTION) {
 // Watch and serve files in dev
 else {
   await context.watch();
-  await context
-    .serve({
-      servedir: BUILD_DIRECTORY,
-      port: SERVE_PORT,
-    })
-    .then(logServedFiles);
+
+  // Start esbuild's server
+  const { host, port } = await context.serve({
+    servedir: BUILD_DIRECTORY,
+    host: 'localhost',
+  });
+
+  // Create a proxy server with CORS headers
+  createServer((req, res) => {
+    // Handle CORS preflight requests
+    if (req.method === 'OPTIONS') {
+      res.writeHead(200, {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Access-Control-Request-Private-Network',
+        'Access-Control-Allow-Private-Network': 'true',
+        'Access-Control-Max-Age': '86400',
+      });
+      res.end();
+      return;
+    }
+
+    const options = {
+      hostname: host,
+      port: port,
+      path: req.url,
+      method: req.method,
+      headers: req.headers,
+    };
+
+    const proxyReq = request(options, (proxyRes) => {
+      // Remove any existing CORS headers from esbuild to avoid duplicates
+      const headers = { ...proxyRes.headers };
+      delete headers['access-control-allow-origin'];
+      delete headers['access-control-allow-methods'];
+      delete headers['access-control-allow-headers'];
+
+      // Add CORS headers to allow any origin
+      res.writeHead(proxyRes.statusCode, {
+        ...headers,
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Access-Control-Request-Private-Network',
+        'Access-Control-Allow-Private-Network': 'true',
+      });
+      proxyRes.pipe(res, { end: true });
+    });
+
+    req.pipe(proxyReq, { end: true });
+  }).listen(SERVE_PORT, () => {
+    logServedFiles();
+  });
 }
 
 /**

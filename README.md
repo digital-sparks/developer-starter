@@ -1,6 +1,6 @@
-# Finsweet Developer Starter
+# Digital Sparks Developer Starter
 
-A starter template for both Client & Power projects.
+A starter template for web development projects.
 
 Before starting to work with this template, please take some time to read through the documentation.
 
@@ -26,10 +26,9 @@ Before starting to work with this template, please take some time to read throug
 This template contains some preconfigured development tools:
 
 - [Typescript](https://www.typescriptlang.org/): A superset of Javascript that adds an additional layer of Typings, bringing more security and efficiency to the written code.
-- [Prettier](https://prettier.io/): Code formatting that assures consistency across all Finsweet's projects.
-- [ESLint](https://eslint.org/): Code linting that enforces industries' best practices. It uses [our own custom configuration](https://github.com/finsweet/eslint-config) to maintain consistency across all Finsweet's projects.
-- [Playwright](https://playwright.dev/): Fast and reliable end-to-end testing.
-- [esbuild](https://esbuild.github.io/): Javascript bundler that compiles, bundles and minifies the original Typescript files.
+- [Prettier](https://prettier.io/): Code formatting that assures consistency across all projects.
+- [ESLint](https://eslint.org/): Code linting that enforces industries' best practices. Uses [Finsweet's configuration](https://github.com/finsweet/eslint-config) to maintain consistency.
+- [esbuild](https://esbuild.github.io/): Javascript bundler that compiles, bundles and minifies the original files.
 - [Changesets](https://github.com/changesets/changesets): A way to manage your versioning and changelogs.
 - [Finsweet's TypeScript Utils](https://github.com/finsweet/ts-utils): Some utilities to help you in your Webflow development.
 
@@ -56,14 +55,6 @@ After creating the new repository, open it in your terminal and install the pack
 ```bash
 pnpm install
 ```
-
-If this is the first time using Playwright and you want to use it in this project, you'll also have to install the browsers by running:
-
-```bash
-pnpm playwright install
-```
-
-You can read more about the use of Playwright in the [Testing](#testing) section.
 
 It is also recommended that you install the following extensions in your VSCode editor:
 
@@ -149,21 +140,6 @@ You can set up path aliases using the `paths` setting in `tsconfig.json`. This t
 
 To avoid any surprises, take some time to familiarize yourself with the [tsconfig](/tsconfig.json) enabled flags.
 
-## Testing
-
-As previously mentioned, this library has [Playwright](https://playwright.dev/) included as an automated testing tool.
-
-All tests are located under the `/tests` folder. This template includes a test spec example that will help you catch up with Playwright.
-
-After [installing the dependencies](#installing), you can try it out by running `pnpm test`.
-Make sure you replace it with your own tests! Writing proper tests will help improve the maintainability and scalability of your project in the long term.
-
-By default, Playwright will also run `pnpm dev` in the background while the tests are running, so [your files served](#serving-files-on-development-mode) under `localhost:3000` will run as usual.
-You can disable this behavior in the `playwright.config.ts` file.
-
-If you project doesn't require any testing, you should disable the Tests job in the [CI workflow](#continuous-integration) by commenting it out in the `.github/workflows/ci.yml` file.
-This will prevent the tests from running when you open a Pull Request.
-
 ## Contributing guide
 
 In general, your development workflow should look like this:
@@ -186,8 +162,6 @@ This template contains a set of predefined scripts in the `package.json` file:
 - `pnpm lint:fix`: Fixes all auto-fixable issues in ESLint.
 - `pnpm check`: Checks for TypeScript errors in the codebase.
 - `pnpm format`: Formats all the files in the codebase using Prettier. You probably won't need this script if you have automatic [formatting on save](https://www.digitalocean.com/community/tutorials/code-formatting-with-prettier-in-visual-studio-code#automatically-format-on-save) active in your editor.
-- `pnpm test`: Will run all the tests that are located in the `/tests` folder.
-- `pnpm test:headed`: Will run all the tests that are located in the `/tests` folder visually in headed browsers.
 - `pnpm release`: This command is defined for [Changesets](https://github.com/changesets/changesets). You don't have to interact with it.
 - `pnpm run update`: Scans the dependencies of the project and provides an interactive UI to select the ones that you want to update.
 
@@ -197,14 +171,9 @@ This template contains a set of helpers with proper CI/CD workflows.
 
 ### Continuous Integration
 
-When you open a Pull Request, a Continuous Integration workflow will run to:
+When you open a Pull Request, a Continuous Integration workflow will run to lint & check your code. It uses the `pnpm lint` and `pnpm check` commands under the hood.
 
-- Lint & check your code. It uses the `pnpm lint` and `pnpm check` commands under the hood.
-- Run the automated tests. It uses the `pnpm test` command under the hood.
-
-If any of these jobs fail, you will get a warning in your Pull Request and should try to fix your code accordingly.
-
-**Note:** If your project doesn't contain any defined tests in the `/tests` folder, you can skip the Tests workflow job by commenting it out in the `.github/workflows/ci.yml` file. This will significantly improve the workflow running times.
+If this job fails, you will get a warning in your Pull Request and should try to fix your code accordingly.
 
 ### Continuous Deployment
 
@@ -237,10 +206,32 @@ To enable full compatibility with Changesets, go to the repository settings (`Se
 
 Enabling this setting for your organization account (`Account Settings > Actions > General`) could help streamline the process. By doing so, any new repos created under the org will automatically inherit the setting, which can save your teammates time and effort. This can only be applied to organization accounts at the time.
 
-#### How to automatically deploy updates to npm
+#### Deployment Options
 
-The `Release` GitHub Action uses OpenID Connect to authenticate with npm, allowing automatic deployments without the need to store any secret in your repository.
+This project supports multiple deployment targets:
+- **npm** - Publish as an npm package
+- **S3 + CloudFront** - Deploy to AWS for CDN hosting (like a private jsDelivr)
 
-To enable deployments to npm, [configure the GitHub repository as a Trusted Publisher](https://docs.npmjs.com/trusted-publishers) and Changesets will take care of the rest.
+You can enable one, both, or neither using GitHub repository variables. See the comprehensive **[DEPLOYMENT.md](DEPLOYMENT.md)** guide for:
+- Step-by-step setup instructions
+- AWS configuration for S3/CloudFront
+- npm Trusted Publisher setup
+- Enable/disable flags
+- Troubleshooting
 
-If this is the first time deploying to npm from this repository, you might need to [manually publish the first version of the package](https://docs.npmjs.com/creating-and-publishing-scoped-public-packages#publishing-scoped-public-packages).
+**Quick Configuration:**
+
+Go to **Settings → Secrets and variables → Actions → Variables** and add:
+
+| Variable | Value | Description |
+|----------|-------|-------------|
+| `ENABLE_NPM_PUBLISH` | `true`/`false` | Enable npm publishing |
+| `ENABLE_S3_DEPLOY` | `true`/`false` | Enable S3/CloudFront deployment |
+
+For detailed setup, see [DEPLOYMENT.md](DEPLOYMENT.md).
+
+---
+
+## Attribution
+
+This template was originally created by [Finsweet](https://finsweet.com/) and has been adapted for Digital Sparks projects. We thank Finsweet for their excellent starter template and open-source contributions to the Webflow community.

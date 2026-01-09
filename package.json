@@ -1,24 +1,24 @@
 {
-  "name": "@finsweet/developer-starter",
+  "name": "@digital-sparks/developer-starter",
   "version": "0.0.0",
-  "description": "Developer starter template for Finsweet projects.",
-  "homepage": "https://github.com/finsweet/developer-starter#readme",
+  "description": "Developer starter template for Digital Sparks projects.",
+  "homepage": "https://github.com/digital-sparks/developer-starter#readme",
   "license": "ISC",
   "keywords": [],
   "author": {
-    "name": "Finsweet",
-    "url": "https://finsweet.com/"
+    "name": "Digital Sparks",
+    "url": "https://digital-sparks.com/"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/finsweet/developer-starter.git"
+    "url": "git+https://github.com/digital-sparks/developer-starter.git"
   },
   "bugs": {
-    "url": "https://github.com/finsweet/developer-starter/issues"
+    "url": "https://github.com/digital-sparks/developer-starter/issues"
   },
   "type": "module",
-  "main": "src/index.ts",
-  "module": "src/index.ts",
+  "main": "src/index.js",
+  "module": "src/index.js",
   "files": [
     "dist"
   ],
@@ -29,8 +29,6 @@
     "lint:fix": "eslint ./src --fix",
     "check": "tsc --noEmit",
     "format": "prettier --write ./src",
-    "test": "playwright test",
-    "test:ui": "playwright test --ui",
     "release": "changeset publish",
     "update": "pnpm update -i -L -r"
   },
@@ -40,7 +38,6 @@
     "@eslint/js": "^9.19.0",
     "@finsweet/eslint-config": "^3.0.3",
     "@finsweet/tsconfig": "^1.4.2",
-    "@playwright/test": "^1.50.1",
     "cross-env": "^7.0.3",
     "esbuild": "^0.24.2",
     "eslint": "^9.19.0",
